@@ -3,7 +3,7 @@ A Flask app to use Google Contacts as the phone directory for the
 Cisco 79xx IP phones.
 Copyright (C) 2010 Francois Lebel <francoislebel@gmail.com>
 Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
-http://github.com/flebel/cisco79xx_phone_directory
+http://github.com/psychedelys/cisco79xx_phone_directory
 
 # Usage
 
