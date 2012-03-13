@@ -6,11 +6,9 @@ http://github.com/flebel/cisco79xx_phone_directory
 
 # Usage
 
-Backup your Google Contacts using the Google Contacts API, or use the
-downloadGoogleContacts.rb script, which can be found at the following URL:
-http://github.com/flebel/downloadGoogleContacts.rb
+Backup your Google Contacts, own cloud contact, LDAP stuff is one csv file.
 
-The resulting XML file should be named 'contacts.xml' and located in the
+The resulting CSV file should be named 'contacts_extract.csv' and located in the
 directory where the phone directory script resides.
 
 If you haven't already, install the Flask Python Microframework using
@@ -30,11 +28,13 @@ according to your needs.
 
 You will also need to edit the SIPDefault.cnf file located at the root
 of your TFTP server to add a line such as this one:
-directory_url: "http://192.168.0.200:5006/directory.xml"
+directory_url: "http://192.168.178.20:5006/directory.xml"
+
+You will need to edit the script file HOST variable to reflect your change also.
 
 # Limitations
 
 The Cisco 79xx IP phones support up to 32 entries per directory page. This
 is the motivation behind having a contacts search page since most people
-have more than 32 contacts on their Google Contacts account.
+have more than 32 contacts on their {Google|ownCloud|LDAP|Phone} Contacts account.
 
