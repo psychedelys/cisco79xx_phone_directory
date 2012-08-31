@@ -33,6 +33,12 @@ PORT = 5006
 HOST = "192.168.178.20"
 DIRECTORY_URL = "http://%s:%d/directory.xml" % (HOST, PORT)
 
+# For a reason unbeknown to me, the Cisco 7940 IP phone is the only
+# device/browser for which the request.environ["SERVER_PORT"] value is
+# set to 80 although the URL accessed is on another port, therefore
+# forcing us to use a hardcoded port number
+# xml += "\t<URL>%s</URL>\n" % (DIRECTORY_URL)
+
 app = Flask(__name__)
 
 class DirectoryEntry:
@@ -68,7 +74,6 @@ def get_directory():
 
     return directory
 
-
 def generate_directory_xml(directory,offset,maxEntry):
     """
     Generates the XML required to display the phone directory from
@@ -83,33 +88,92 @@ def generate_directory_xml(directory,offset,maxEntry):
         xml += "\t\t<Name>%s</Name>\n" % entry
         xml += "\t\t<Telephone>%s</Telephone>\n" % entry.number
         xml += "\t</DirectoryEntry>\n"
+
+    #xml += "\t<SoftKeyItem>\n"
+    #xml += "\t<Name>Select</Name>\n"
+    #xml += "\t<URL>SoftKey:Select</URL>\n"
+    #xml += "\t<Position>1</Position>\n"
+    #xml += "\t</SoftKeyItem>\n"
     xml += "</CiscoIPPhoneDirectory>\n"
     return xml
-
 
 def generate_search_xml():
     """
     Generates the XML required to display a phone directory search
     page on the Cisco 79xx IP phones.
+
+    Available Input Types are following 
+    # ASCII => 'A'
+    # Telephone => 'T
+    # Numeric => 'N' 
+    # Equation => 'E'
+    # Uppercase => 'U'
+    # Lowercase => 'L'
+    # Password => 'P'
     """
     xml = "<CiscoIPPhoneInput>\n"
     xml += "\t<Title>Search for an entry</Title>\n"
     xml += "\t<Prompt>Enter a search keyword.</Prompt>\n"
-    # For a reason unbeknown to me, the Cisco 7940 IP phone is the only
-    # device/browser for which the request.environ["SERVER_PORT"] value is
-    # set to 80 although the URL accessed is on another port, therefore
-    # forcing us to use a hardcoded port number
-    # xml += "\t<URL>http://%s:%d/directory.xml</URL>\n" % (request.environ["SERVER_NAME"], PORT,)
     xml += "\t<URL>%s</URL>\n" % (DIRECTORY_URL)
     xml += "\t<InputItem>\n"
     xml += "\t\t<DisplayName>Keyword</DisplayName>\n"
     xml += "\t\t<QueryStringParam>keyword</QueryStringParam>\n"
-    xml += "\t\t<InputFlags></InputFlags>\n"
+    xml += "\t\t<InputFlags>A</InputFlags>\n"
+    xml += "\t\t<DefaultValue></DefaultValue>\n"
+    xml += "\t</InputItem>\n"
+    xml += "\t<InputItem>\n"
+    xml += "\t\t<DisplayName>Number</DisplayName>\n"
+    xml += "\t\t<QueryStringParam>phone</QueryStringParam>\n"
+    xml += "\t\t<InputFlags>N</InputFlags>\n"
     xml += "\t\t<DefaultValue></DefaultValue>\n"
     xml += "\t</InputItem>\n"
     xml += "</CiscoIPPhoneInput>\n"
     return xml
 
+def generate_menu_xml():
+    """
+    Generates the XML required to display a phone directory menu
+    page on the Cisco 79xx IP phones.
+    """
+
+    xml = "<CiscoIPPhoneMenu>\n"
+    xml += "\t<Title>Internal Directory Lookup</Title>\n"
+    xml += "\t<Prompt>Search Or Help?</Prompt>\n"
+    xml += "\t<MenuItem>\n"
+    xml += "\t<Name>Search</Name>\n"
+    xml += "\t<URL>%s?search=1</URL>\n" % (DIRECTORY_URL)
+    xml += "\t</MenuItem>\n"
+    xml += "\t<MenuItem>\n"
+    xml += "\t<Name>Help</Name>\n"
+    xml += "\t<URL>%s?help=1</URL>\n" % (DIRECTORY_URL)
+    xml += "\t</MenuItem>\n"
+    xml += "\t</CiscoIPPhoneMenu>\n"
+    return xml
+
+def genereate_help_xml(maxEntry):
+    """
+    Generates the XML required to display the phone directory help menu
+    page on the Cisco 79xx IP phones.
+    """
+
+    xml = "<CiscoIPPhoneText>\n"
+    xml += "\t<Title>Directory Lookup Help</Title>\n"
+    xml += "\t<Text>Enter in either a Name or Number\n"
+    xml += "\t(or part thereof) and hit Submit.\n"
+    xml += "\tThe program will return up to the first %s\n" % ( maxEntry )
+    xml += "\tentries which match your search criteria</Text>\n"
+    xml += "\t<SoftKeyItem>\n"
+    xml += "\t<Name>Search</Name>\n"
+    xml += "\t<URL>%s</URL>\n" % ( DIRECTORY_URL )
+    xml += "\t<Position>4</Position>\n"
+    xml += "\t</SoftKeyItem>\n"
+    xml += "\t<SoftKeyItem>\n"
+    xml += "\t<Name>Exit</Name>\n"
+    xml += "\t<URL>%s</URL>\n" % ( DIRECTORY_URL )
+    xml += "\t<Position>3</Position>\n"
+    xml += "\t</SoftKeyItem>\n"
+    xml += "\t</CiscoIPPhoneText>\n"
+    return xml
 
 @app.route("/directory.xml")
 def index():
@@ -130,9 +194,15 @@ def index():
         # Get the directory and filter the entries based on the keyword, then sort them
         directory = sorted([entry for entry in get_directory() if keyword.lower() in unicode(entry.name).lower() or keyword in unicode(entry.number)], key=lambda entry: unicode(entry))
         xml = generate_directory_xml(directory,offset,maxEntry)
+    elif "phone" in request.args:
+        phone = request.args["phone"]
+        # Get the directory and filter the entries based on the keyword, then sort them
+        directory = sorted([entry for entry in get_directory() if phone.lower() in unicode(entry.name).lower() or phone in unicode(entry.number)], key=lambda entry: unicode(entry))
+        xml = generate_directory_xml(directory,offset,maxEntry)
     # If we haven't received the query string, display the search menu
     else:
         xml = generate_search_xml()
+
     response = app.response_class(xml, mimetype='text/xml')
     # response.headers['X-offset'] = 'parachutes are cool'
     if myentry == 32:
