@@ -149,11 +149,27 @@ class ContactsSample(object):
                  print "ERROR - Could not remove accent from the data source from Line: %s" % (entry.title.text)
    
               entry.title.text = entry.title.text.title()
-   
-              # append the contact data preformated in the dictionary
-              list.append( "%s;%s;%s" %(entry.title.text, phone.rel, phone.text) )  
-        return list
 
+              # Your Personal exeption rules
+
+              # End of your Personal exeption rules
+
+              # list entry is format
+              listentry = str ( "%s;%s;%s" %(entry.title.text, phone.rel, phone.text) )  
+              # print listentry
+
+              # Check that the entry doesnot yet exist
+              found = 0
+              for x in list:
+                 if x == listentry:
+                    # print 'Duplicate of ' + x
+                    found = 1  
+                    break 
+
+              # append the contact data preformated in the dictionary
+              if found == 0:
+                 list.append( listentry )
+        return list
 
   def PrintDict_to_disk(self, dict):
         """Prints out the contents of a feed to the console.
@@ -186,7 +202,7 @@ def main():
   p = ConfigParser.ConfigParser()
   p.read("global.ini")
 
-  sections = [ 'cpt_1', 'cpt_2', 'cpt_3' ]
+  sections = p.sections()
   dict = []
 
   for section in sections: 
