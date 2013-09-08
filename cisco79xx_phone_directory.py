@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
-#   Cisco 79xx phone directory: a Flask app to use Google Contacts
+#   Cisco 79xx phone directory: a Flask app to use a csv contacts file
 #   as the phone directory for the Cisco 79xx IP phones.
+#
+#   Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
+#   http://github.com/psychedelys/cisco79xx_phone_directory
+#
+#   Based on:
 #   Copyright (C) 2010-2011 Francois Lebel <francoislebel@gmail.com>
 #   http://github.com/flebel/cisco79xx_phone_directory
 #
@@ -58,10 +63,9 @@ class DirectoryEntry:
         else:
             return self.name
 
-
 def get_directory():
     """
-    Parses the Google Contacts file and returns its contents as a list
+    Parses the CSV Contacts file and returns its contents as a list
     of DirectoryEntry instances.
     """
     print "parsing file %s" % CONTACTS_FILE 
