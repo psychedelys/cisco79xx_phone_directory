@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-#   Asterisk csv contact search directory: a Flask app to use Google Contacts
-#   as the phone directory for the Cisco 79xx IP phones.
+#   Asterisk csv contact search directory: a agi-script to use an extracted 
+#   csv contacts file as the phone directory for asterisk.
 #   Copyright (C) 2013 psychedelys <psychedelys@gmail.com>
 #   http://github.com/psychedelys/cisco79xx_phone_directory
 #
@@ -19,7 +19,6 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-import re
 import unicodedata
 from xml.etree import ElementTree
 import csv
@@ -51,6 +50,7 @@ def get_directory():
     of DirectoryEntry instances.
     """
     #print "parsing file %s" % CONTACTS_FILE
+
     directory = []
 
     for line in csv.reader(open(CONTACTS_FILE), delimiter=';', skipinitialspace=True):
@@ -65,12 +65,19 @@ def main(number):
 
    """
    # Get the directory and filter the entries based on the keyword, then sort them
-   directory = sorted([entry for entry in get_directory() if number.lower() in unicode(entry.name).lower() or number in unicode(entry.number)], key=lambda entry: unicode(entry))
-   for entry in directory:
-       print "SET CALLERID \"%s\"" % entry
-       #print "set %s" % entry.number
-       break 
-
+   getphonebook = get_directory()
+   directory = sorted([entry for entry in getphonebook if number.lower() in unicode(entry.name).lower() or number in unicode(entry.number)], key=lambda entry: unicode(entry))
+   if directory:
+      for entry in directory:
+          print "SET CALLERID \"%s <%s>\"" % (entry, number)
+          break 
+   elif number[0] == '0':
+      modnumber = number.lstrip('0')
+      directory = sorted([entry for entry in getphonebook if modnumber.lower() in unicode(entry.name).lower() or modnumber in unicode(entry.number)], key=lambda entry: unicode(entry))
+      for entry in directory:
+          print "SET CALLERID \"%s <%s>\"" % (entry, number)
+          break 
+   
 if __name__ == "__main__":
     """
     Starts the main process for the phone reverse lookup.
