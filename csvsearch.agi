@@ -69,12 +69,14 @@ def main(number):
    directory = sorted([entry for entry in getphonebook if number.lower() in unicode(entry.name).lower() or number in unicode(entry.number)], key=lambda entry: unicode(entry))
    if directory:
       for entry in directory:
+          print >> sys.stderr, "Setting CallerID to: \"%s <%s>\"" % (entry, number)
           print "SET CALLERID \"%s <%s>\"" % (entry, number)
           break 
    elif number[0] == '0':
       modnumber = number.lstrip('0')
       directory = sorted([entry for entry in getphonebook if modnumber.lower() in unicode(entry.name).lower() or modnumber in unicode(entry.number)], key=lambda entry: unicode(entry))
       for entry in directory:
+          print >> sys.stderr, "Setting CallerID to: \"%s <%s>\"" % (entry, number)
           print "SET CALLERID \"%s <%s>\"" % (entry, number)
           break 
    
@@ -83,5 +85,18 @@ if __name__ == "__main__":
     Starts the main process for the phone reverse lookup.
     """
     #print sys.argv[1]
-    main(sys.argv[1])
+    try:
+       param = sys.argv[1]
+    except NameError:
+       param = None
+    except IndexError:
+       param = None
+
+    if param is None:
+       print >> sys.stderr, "The calling resolution parameter is not defined."
+       sys.exit(0)
+    elif param[0] == '+':
+       param = param.lstrip('+')
+
+    main(param)
     sys.exit(0)
