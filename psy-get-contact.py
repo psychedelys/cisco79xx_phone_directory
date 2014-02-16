@@ -74,6 +74,7 @@ class ContactsSample(object):
       functionality of the Contacts feed.
     """
     self.gd_client = gdata.contacts.service.ContactsService()
+    self.gd_client.ssl = True
     self.gd_client.email = email
     self.gd_client.password = password
     self.gd_client.source = source
