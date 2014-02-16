@@ -200,7 +200,7 @@ def index():
         xml = generate_directory_xml(directory,offset,maxEntry)
     elif "phone" in request.args:
         phone = request.args["phone"]
-        # Get the directory and filter the entries based on the keyword, then sort them
+        # Get the directory and filter the entries based on the phone number, then sort them
         directory = sorted([entry for entry in get_directory() if phone.lower() in unicode(entry.name).lower() or phone in unicode(entry.number)], key=lambda entry: unicode(entry))
         xml = generate_directory_xml(directory,offset,maxEntry)
     # If we haven't received the query string, display the search menu
