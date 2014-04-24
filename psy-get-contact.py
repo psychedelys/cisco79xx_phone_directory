@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# psy-get-contact.py v0.1
+# psy-get-contact.py v0.2
 # By: psychedelys
 # Email: psychedelys@googlemail.com
 # https://github.com/psychedelys/cisco79xx_phone_directory
@@ -37,7 +37,67 @@ from xml.etree import ElementTree
 import atom
 import ConfigParser
 
-DIGITS_RE = re.compile(r'[^\d]+')
+# Encode your Personal exeption rules inside the following dicts
+
+skip_pattern_label = {
+  'old': r'old|obsolet|deprecated',
+}
+
+sub_pattern_label = {
+}
+
+skip_pattern_rel = {
+}
+
+sub_pattern_rel = {
+  'dash': r'^.*#',
+}
+
+skip_pattern_text = {
+  'notint': r'^[^(\+|00)]',
+}
+
+sub_pattern_text = {
+  'non-digit': r'[^\d]+',
+}
+
+skip_pattern_title = {
+}
+
+sub_pattern_title = {
+}
+
+skip_cmd_label = {}
+skip_cmd_rel = {}
+skip_cmd_text = {}
+skip_cmd_title = {}
+for pat in skip_pattern_label:
+  skip_cmd_label[pat] = re.compile(skip_pattern_label[pat], flags=re.I)
+
+for pat in skip_pattern_rel:
+  skip_cmd_rel[pat] = re.compile(skip_pattern_rel[pat], flags=re.I)
+
+for pat in skip_pattern_text:
+  skip_cmd_text[pat] = re.compile(skip_pattern_text[pat], flags=re.I)
+
+for pat in skip_pattern_title:
+  skip_cmd_title[pat] = re.compile(skip_pattern_title[pat], flags=re.I)
+
+sub_cmd_label = {}
+sub_cmd_rel = {}
+sub_cmd_text = {}
+sub_cmd_title = {}
+for pat in sub_pattern_label:
+  sub_cmd_label[pat] = re.compile(sub_pattern_label[pat])
+
+for pat in sub_pattern_rel:
+  sub_cmd_rel[pat] = re.compile(sub_pattern_rel[pat])
+
+for pat in sub_pattern_text:
+  sub_cmd_text[pat] = re.compile(sub_pattern_text[pat])
+
+for pat in sub_pattern_title:
+  sub_cmd_title[pat] = re.compile(sub_pattern_title[pat])
 
 def remove_accents(str):
         """
@@ -105,55 +165,95 @@ class ContactsSample(object):
            print '\n%d entries in feed.\n' % (len(self.feed.entry))
 
         for i, entry in enumerate(self.feed.entry):
-           # Phone number in the contacts
-           for phone in entry.phone_number:
-              if phone.label == 'old':
-                 continue
-              phone.text = re.sub(r'\s', '', phone.text)
-              phone.rel = re.sub(r'.*#', '', phone.rel)
-              if not phone.text.startswith('+'):
-                 continue
 
-              phone.text = re.sub(r'^\+', '00', phone.text)
-              # Discard non-digit characters
-              phone.text = DIGITS_RE.sub('', phone.text)
+          if entry.title.text is None:
+            # print "ERROR - Could not get from Line: %s" % (entry.title.text)
+            continue
 
-              try:
-                 try:
-                    try:
-                       entry.title.text=entry.title.text.decode('utf-8','ignore')
-                    except UnicodeDecodeError:
-                       entry.title.text=entry.title.text.decode('iso8859_15','replace')
-                    except UnicodeEncodeError:
-                       entry.title.text=entry.title.text.decode('iso8859_15','replace')
+          try:
+            try:
+               try:
+                  entry.title.text=entry.title.text.decode('utf-8','ignore')
+               except UnicodeDecodeError:
+                  entry.title.text=entry.title.text.decode('iso8859_15','replace')
+               except UnicodeEncodeError:
+                  entry.title.text=entry.title.text.decode('iso8859_15','replace')
+                     
+            except UnicodeDecodeError:
+               print entry.title.text
+               print unicode(entry.title.text, 'utf-8')
+               entry.title.text=entry.title.text.decode('cp437','replace')
+            except UnicodeEncodeError:
+               print entry.title.text
+               print unicode(entry.title.text, 'utf-8')
+               entry.title.text=entry.title.text.decode('cp437','replace')
    
-                 except UnicodeDecodeError:
-                    print entry.title.text
-                    print unicode(entry.title.text, 'utf-8')
-                    entry.title.text=entry.title.text.decode('cp437','replace')
-                 except UnicodeEncodeError:
-                    print entry.title.text
-                    print unicode(entry.title.text, 'utf-8')
-                    entry.title.text=entry.title.text.decode('cp437','replace')
+          except UnicodeDecodeError:
+            print "ERROR - Could not remove from Line: %s" % (entry.title.text)
+            continue
+          except UnicodeEncodeError:
+            print "ERROR - Could not remove from Line: %s" % (entry.title.text)
+            continue
    
-              except UnicodeDecodeError:
-                 print "ERROR - Could not remove from Line: %s" % (entry.title.text)
-                 continue
-              except UnicodeEncodeError:
-                 print "ERROR - Could not remove from Line: %s" % (entry.title.text)
-                 continue
+          try:
+            entry.title.text = remove_accents(entry.title.text)
+            entry.title.text = remove_accents_bis(entry.title.text)
+          except:
+            print "ERROR - Could not remove accent from the data source from Line: %s" % (entry.title.text)
    
-              try:
-                 entry.title.text = remove_accents(entry.title.text)
-                 entry.title.text = remove_accents_bis(entry.title.text)
-              except:
-                 print "ERROR - Could not remove accent from the data source from Line: %s" % (entry.title.text)
-   
-              entry.title.text = entry.title.text.title()
+          entry.title.text = entry.title.text.title()
 
-              # Your Personal exeption rules
+          skip = 0
+          for regex in skip_cmd_title:
+            if skip_cmd_title[regex].search( entry.title.text ):
+              skip = 1
+              break
 
-              # End of your Personal exeption rules
+          if skip == 1:
+            continue
+
+          # Phone number in the contacts
+          for phone in entry.phone_number:
+
+              # Skipping
+              skip = 0
+              if phone.label:
+                for regex in skip_cmd_label:
+                  if skip_cmd_label[regex].search( phone.label ):
+                    skip = 1
+                    break
+
+              if phone.rel and skip == 0:
+                for regex in skip_cmd_rel:
+                  if skip_cmd_rel[regex].search( phone.rel ):
+                    skip = 1
+                    break
+
+              if phone.text and skip == 0:
+                for regex in skip_cmd_text:
+                  if skip_cmd_text[regex].search( phone.text ):
+                    skip = 1
+                    break
+
+              if skip == 1:
+                continue
+
+              # Clean-up
+              if phone.label:
+                for regex in sub_cmd_label:
+                  phone.label = sub_cmd_label[regex].sub( '', phone.label)
+
+              if phone.rel:
+                for regex in sub_cmd_rel:
+                  phone.rel = sub_cmd_rel[regex].sub( '', phone.rel)
+
+              if phone.text:
+                phone.text = re.sub(r'^\+', '00', phone.text)
+                for regex in sub_cmd_text:
+                  phone.text = sub_cmd_text[regex].sub('', phone.text)
+
+              if phone.label is not None:
+                phone.rel = phone.rel+'-'+phone.label
 
               # list entry is format
               listentry = str ( "%s;%s;%s" %(entry.title.text, phone.rel, phone.text) )  
@@ -219,6 +319,8 @@ def main():
     except gdata.service.BadAuthentication:
       print 'Invalid user credentials given.'
       return
+
+    print "account: %s" % (google_email)
 
     dict = contacts.extract_to_dict(dict)
 
