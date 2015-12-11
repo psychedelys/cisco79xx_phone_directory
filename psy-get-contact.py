@@ -1,13 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# psy-get-contact.py v0.2
+# psy-get-contact.py v0.3
 # By: psychedelys
 # Email: psychedelys@googlemail.com
 # https://github.com/psychedelys/cisco79xx_phone_directory
 # Part of the cisco79xx_phone_directory stuff hosted on github.
 # Purpose: extract google contact from severals accounts and generate an all-in-one csv file.
 # Requirements: python, gdata python client.
+
 #
 # License:
 #
@@ -28,14 +29,29 @@
 # On Debian & Ubuntu systems, a complete copy of the GPL can be found under
 # /usr/share/common-licenses/GPL-3, or (at your option) any later version
 
-import re,sys,os
-import unicodedata
-import gdata.contacts.data
-import gdata.contacts.client
-import gdata.contacts.service
-from xml.etree import ElementTree
-import atom
+import os
+import sys
+import json
 import ConfigParser
+import webbrowser
+import pprint
+import re
+import unicodedata
+
+import httplib2
+
+from six.moves import input
+
+from apiclient import discovery
+from oauth2client import client
+
+import atom.data
+import gdata.data
+import gdata.contacts.client
+import gdata.contacts.data
+from xml.etree import ElementTree
+
+pp = pprint.PrettyPrinter(indent=4)
 
 # Encode your Personal exeption rules inside the following dicts
 
@@ -115,217 +131,242 @@ def remove_accents_bis(str):
         return str.replace( 'ß','ss')
 
 
-class ContactsSample(object):
-  """ContactsSample object demonstrates operations with the Google Contacts feed."""
 
-  def __init__(self, email, password, source):
-    """Constructor for the ContactsSample object.
-    
-    Takes an email and password associated with a google mail account to
-    demonstrate the functionality of the Contacts feed.
-    
-    Args:
-      email: [string] The e-mail address of the account to use for the sample.
-      password: [string] The password associated with the previously [email parameter] account specified.
-      source: [string] The service (scripts) requesting the data.
-    
-    Yields:
-      A ContactsSample object used to run the sample demonstrating the
-      functionality of the Contacts feed.
-    """
-    self.gd_client = gdata.contacts.service.ContactsService()
-    self.gd_client.ssl = True
-    self.gd_client.email = email
-    self.gd_client.password = password
-    self.gd_client.source = source
-    self.gd_client.ProgrammaticLogin()
+def extract_to_dict(feed ,list):
+      """Prints out the contents of a feed to the console.
 
-    query = gdata.contacts.service.ContactsQuery()
-    query.max_results = 1000
-    self.feed = self.gd_client.GetContactsFeed(query.ToUri())
+      Args:
+      feed: A gdata.contacts.ContactsFeed instance.
 
+      Returns:
+      The number of entries printed, including those previously printed as
+      specified in ctr. This is for passing as an argument to ctr on
+      successive calls to this method.
 
-  def extract_to_dict(self, list):
-        """Prints out the contents of a feed to the console.
+      """
 
-        Args:
-        feed: A gdata.contacts.ContactsFeed instance.
+      if not feed.entry:
+         print ('\nNo entries in feed.\n')
+         return 0
+      else:
+         print ('\n%d entries in feed.\n' % (len(feed.entry)))
 
-        Returns:
-        The number of entries printed, including those previously printed as
-        specified in ctr. This is for passing as an argument to ctr on
-        successive calls to this method.
+      for i, entry in enumerate(feed.entry):
 
-        """
+        if entry.title.text is None:
+          # print "ERROR - Could not get from Line: %s" % (entry.title.text)
+          continue
 
-        if not self.feed.entry:
-           print '\nNo entries in feed.\n'
-           return 0
-        else:
-           print '\n%d entries in feed.\n' % (len(self.feed.entry))
-
-        for i, entry in enumerate(self.feed.entry):
-
-          if entry.title.text is None:
-            # print "ERROR - Could not get from Line: %s" % (entry.title.text)
-            continue
-
+        try:
           try:
-            try:
-               try:
-                  entry.title.text=entry.title.text.decode('utf-8','ignore')
-               except UnicodeDecodeError:
-                  entry.title.text=entry.title.text.decode('iso8859_15','replace')
-               except UnicodeEncodeError:
-                  entry.title.text=entry.title.text.decode('iso8859_15','replace')
-                     
-            except UnicodeDecodeError:
-               print entry.title.text
-               print unicode(entry.title.text, 'utf-8')
-               entry.title.text=entry.title.text.decode('cp437','replace')
-            except UnicodeEncodeError:
-               print entry.title.text
-               print unicode(entry.title.text, 'utf-8')
-               entry.title.text=entry.title.text.decode('cp437','replace')
-   
+             try:
+                entry.title.text=entry.title.text.decode('utf-8','ignore')
+             except UnicodeDecodeError:
+                entry.title.text=entry.title.text.decode('iso8859_15','replace')
+             except UnicodeEncodeError:
+                entry.title.text=entry.title.text.decode('iso8859_15','replace')
+                   
           except UnicodeDecodeError:
-            print "ERROR - Could not remove from Line: %s" % (entry.title.text)
-            continue
+             print(entry.title.text)
+             print(unicode(entry.title.text, 'utf-8'))
+             entry.title.text=entry.title.text.decode('cp437','replace')
           except UnicodeEncodeError:
-            print "ERROR - Could not remove from Line: %s" % (entry.title.text)
+             print(entry.title.text)
+             print(unicode(entry.title.text, 'utf-8'))
+             entry.title.text=entry.title.text.decode('cp437','replace')
+ 
+        except UnicodeDecodeError:
+          print("ERROR - Could not remove from Line: %s" % (entry.title.text))
+          continue
+        except UnicodeEncodeError:
+          print("ERROR - Could not remove from Line: %s" % (entry.title.text))
+          continue
+ 
+        try:
+          entry.title.text = remove_accents(entry.title.text)
+          entry.title.text = remove_accents_bis(entry.title.text)
+        except:
+          print("ERROR - Could not remove accent from the data source from Line: %s" % (entry.title.text))
+ 
+        entry.title.text = entry.title.text.title()
+
+        skip = 0
+        for regex in skip_cmd_title:
+          if skip_cmd_title[regex].search( entry.title.text ):
+            skip = 1
+            break
+
+        if skip == 1:
+          continue
+
+        # Phone number in the contacts
+        for phone in entry.phone_number:
+
+            # Skipping
+            skip = 0
+            if phone.label:
+              for regex in skip_cmd_label:
+                if skip_cmd_label[regex].search( phone.label ):
+                  skip = 1
+                  break
+
+            if phone.rel and skip == 0:
+              for regex in skip_cmd_rel:
+                if skip_cmd_rel[regex].search( phone.rel ):
+                  skip = 1
+                  break
+
+            if phone.text and skip == 0:
+              for regex in skip_cmd_text:
+                if skip_cmd_text[regex].search( phone.text ):
+                  skip = 1
+                  break
+
+            if skip == 1:
+              continue
+
+            # Clean-up
+            if phone.label:
+              for regex in sub_cmd_label:
+                phone.label = sub_cmd_label[regex].sub( '', phone.label)
+
+            if phone.rel:
+              for regex in sub_cmd_rel:
+                phone.rel = sub_cmd_rel[regex].sub( '', phone.rel)
+
+            if phone.text:
+              phone.text = re.sub(r'^\+', '00', phone.text)
+              for regex in sub_cmd_text:
+                phone.text = sub_cmd_text[regex].sub('', phone.text)
+
+            if phone.rel is not None and phone.label is not None:
+              phone.rel = phone.rel+'-'+phone.label
+
+            # list entry is format
+            listentry = str ( "%s;%s;%s" %(entry.title.text, phone.rel, phone.text) )  
+            # print listentry
+
+            # Check that the entry doesnot yet exist
+            found = 0
+            for x in list:
+               if x == listentry:
+                  # print 'Duplicate of ' + x
+                  found = 1  
+                  break 
+
+            # append the contact data preformated in the dictionary
+            if found == 0:
+               list.append( listentry )
+      return list
+
+
+def PrintDict_to_disk(dict):
+      """Prints out the contents of a feed to the console.
+
+      Args:
+      dict: A python dictionary containing the data inside.
+
+      Returns:
+      Nothing, but generate a csv file 'contacts_extract.csv'.
+
+      """
+
+      if len(dict) == 0 :
+              print ('\nNo entries in final csv.\n')
+              return 0
+      else:
+              print ('\n%d entries in final csv.\n' % (len(dict)))
+
+      f = open('contacts_extract.csv', 'w')
+      for i in dict:
+          f.write( "%s\n" %(i) )
+      f.close()
+
+
+
+
+
+if __name__ == '__main__':
+
+    config_file = "global.ini"
+
+    ########
+
+    reload(sys)
+    sys.setdefaultencoding( "utf-8" )
+
+    config = ConfigParser.ConfigParser()
+    config.read(config_file)
+    write_config = 0
+  
+    sections = config.sections()
+    dict = []
+  
+    for email in sections: 
+        print("Email:%s" % email)
+        if config.get(email, 'enable') != '1':
+            print("   is not enabed.")
             continue
-   
-          try:
-            entry.title.text = remove_accents(entry.title.text)
-            entry.title.text = remove_accents_bis(entry.title.text)
-          except:
-            print "ERROR - Could not remove accent from the data source from Line: %s" % (entry.title.text)
-   
-          entry.title.text = entry.title.text.title()
-
-          skip = 0
-          for regex in skip_cmd_title:
-            if skip_cmd_title[regex].search( entry.title.text ):
-              skip = 1
-              break
-
-          if skip == 1:
+ 
+        if config.get(email, 'type') != 'gmail':
+            print("   is not a gmail.")
             continue
+    
+        # https://www.google.com/m8/feeds
+        # https://www.googleapis.com/auth/contacts.readonly
 
-          # Phone number in the contacts
-          for phone in entry.phone_number:
+        flow = client.flow_from_clientsecrets(
+            'client_secrets.json',
+            # scope='https://www.googleapis.com/auth/contacts.readonly',
+            scope='https://www.google.com/m8/feeds',
+            redirect_uri='urn:ietf:wg:oauth:2.0:oob')
 
-              # Skipping
-              skip = 0
-              if phone.label:
-                for regex in skip_cmd_label:
-                  if skip_cmd_label[regex].search( phone.label ):
-                    skip = 1
-                    break
+        pp.pprint(config.items(email))
 
-              if phone.rel and skip == 0:
-                for regex in skip_cmd_rel:
-                  if skip_cmd_rel[regex].search( phone.rel ):
-                    skip = 1
-                    break
+        if not config.has_option(email, 'json'):
+            
+            auth_uri = flow.step1_get_authorize_url()
+            webbrowser.open(auth_uri)
+            print(auth_uri)
+          
+            flow_info = flow.step1_get_device_and_user_codes()
+            print("Enter the following code at %s: %s" % (flow_info.verification_url, flow_info.user_code))
+            print("Then press Enter.")
+            input()
+          
+            # Step 2: get credentials
+            # https://developers.google.com/accounts/docs/OAuth2ForDevices#obtainingatoken
+            credentials = flow.step2_exchange(device_flow_info=flow_info)
+            print("Access token: %s" % (credentials.access_token))
+            print("Refresh token: %s" % (credentials.refresh_token))
 
-              if phone.text and skip == 0:
-                for regex in skip_cmd_text:
-                  if skip_cmd_text[regex].search( phone.text ):
-                    skip = 1
-                    break
-
-              if skip == 1:
-                continue
-
-              # Clean-up
-              if phone.label:
-                for regex in sub_cmd_label:
-                  phone.label = sub_cmd_label[regex].sub( '', phone.label)
-
-              if phone.rel:
-                for regex in sub_cmd_rel:
-                  phone.rel = sub_cmd_rel[regex].sub( '', phone.rel)
-
-              if phone.text:
-                phone.text = re.sub(r'^\+', '00', phone.text)
-                for regex in sub_cmd_text:
-                  phone.text = sub_cmd_text[regex].sub('', phone.text)
-
-              if phone.label is not None:
-                phone.rel = phone.rel+'-'+phone.label
-
-              # list entry is format
-              listentry = str ( "%s;%s;%s" %(entry.title.text, phone.rel, phone.text) )  
-              # print listentry
-
-              # Check that the entry doesnot yet exist
-              found = 0
-              for x in list:
-                 if x == listentry:
-                    # print 'Duplicate of ' + x
-                    found = 1  
-                    break 
-
-              # append the contact data preformated in the dictionary
-              if found == 0:
-                 list.append( listentry )
-        return list
-
-  def PrintDict_to_disk(self, dict):
-        """Prints out the contents of a feed to the console.
-
-        Args:
-        dict: A python dictionary containing the data inside.
-
-        Returns:
-        Nothing, but generate a csv file 'contacts_extract.csv'.
-
-        """
-
-        if len(dict) == 0 :
-                print '\nNo entries in final csv.\n'
-                return 0
+            pp.pprint(credentials.to_json())
+    
+            config.set(email, 'json', credentials.to_json())
+            write_config = 1
         else:
-                print '\n%d entries in final csv.\n' % (len(dict))
-
-        f = open('contacts_extract.csv', 'w')
-        for i in dict:
-            f.write( "%s\n" %(i) )
-        f.close()
-
-
-def main():
-
-  reload(sys)
-  sys.setdefaultencoding( "utf-8" )
-
-  p = ConfigParser.ConfigParser()
-  p.read("global.ini")
-
-  sections = p.sections()
-  dict = []
-
-  for section in sections: 
-    if p.get(section, 'enable') != '1':
-      continue
-
-    google_email = p.get(section, 'username')
-    google_passwd = p.get(section, 'password') 
-    google_source = 'psy-get-contact-0.1'
-
-    try:
-      contacts = ContactsSample(google_email, google_passwd, google_source)
-    except gdata.service.BadAuthentication:
-      print 'Invalid user credentials given.'
-      return
-
-    print "account: %s" % (google_email)
-
-    dict = contacts.extract_to_dict(dict)
-
-  contacts.PrintDict_to_disk(dict)
+            # Build credentials object
+            credentials = client.OAuth2Credentials.from_json(config.get(email, 'json'))
+      
+        if write_config == 1:
+            with open(config_file, 'w') as configfile:
+                config.write(configfile)
 
 
-if __name__ == "__main__":
-        main()
+        gc = gdata.contacts.client.ContactsClient(source='gback')
+        auth2token = gdata.gauth.OAuth2TokenFromCredentials(credentials)
+        gc = auth2token.authorize(gc)
+
+        try:
+            query = gdata.contacts.client.ContactsQuery()
+            query.max_results = 1000
+            contacts = gc.GetContacts(q=query)
+        except Exception as e:
+            print ('Exception %s' % (str(e)))
+            continue
+
+        dict = extract_to_dict(contacts, dict)
+        pp.pprint(dict)
+
+    PrintDict_to_disk(dict)
+
