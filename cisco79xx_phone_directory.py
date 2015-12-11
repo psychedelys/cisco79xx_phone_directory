@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 #   Cisco 79xx phone directory: a Flask app to use a csv contacts file
 #   as the phone directory for the Cisco 79xx IP phones.
 #
-#   Copyright (C) 2012 Psychedelys <psychedelys@gmail.com>
+#   Copyright (C) 2012-2015 Psychedelys <psychedelys@gmail.com>
 #   http://github.com/psychedelys/cisco79xx_phone_directory
 #
 #   Based on:
