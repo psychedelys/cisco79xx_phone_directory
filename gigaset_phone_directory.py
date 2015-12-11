@@ -4,7 +4,7 @@
 #   a csv contacts file as the phone directory for the Siemens
 #   Gigaset N510 IP PRO basis.
 #
-#   Copyright (C) 2014 Psychedelys <psychedelys@gmail.com>
+#   Copyright (C) 2014-2015 Psychedelys <psychedelys@gmail.com>
 #   http://github.com/psychedelys/cisco79xx_phone_directory
 #
 #   Based on the cisco script of the same repository and
@@ -76,8 +76,10 @@ def generate_directory_xml(directory,offset,params):
 
     xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
     max = len(directory)
+    # print >> sys.stderr, "in max with '%s' vs. '%s'" % (max, params['count'])
     if max > params['count']:
        max = params['count']
+    # print >> sys.stderr, "in max with '%s' vs. '%s'" % (max, params['count'])
     xml += "<list response=\"%s\" type=\"%s\" reqid=\"%s\" total=\"%s\" first=\"%s\" last=\"%s\" >\n" % ( params['command'], params['type'], params['reqid'], max, params['first'], max )
     id=1
     for entry in directory:
@@ -86,16 +88,16 @@ def generate_directory_xml(directory,offset,params):
         xml += "\t<entry id=\"%i\">\n" % id
         xml += "\t<ln>%s</ln>\n" % entry
         if entry.label == "mobile":
-          print >> sys.stderr, "XML mb:%s,%s,%s" % (id,entry,entry.number)
+          # print >> sys.stderr, "XML mb:%s,%s,%s" % (id,entry,entry.number)
           xml += "\t<mb>%s</mb>\n" % entry.number
         elif entry.label == "work":
-          print >> sys.stderr, "XML w:%s,%s,%s" % (id,entry,entry.number)
+          # print >> sys.stderr, "XML w:%s,%s,%s" % (id,entry,entry.number)
           xml += "\t<hm>%s</hm>\n" % entry.number
         elif entry.label == "home":
-          print >> sys.stderr, "XML hm:%s,%s,%s" % (id,entry,entry.number)
+          # print >> sys.stderr, "XML hm:%s,%s,%s" % (id,entry,entry.number)
           xml += "\t<hm>%s</hm>\n" % entry.number
         else:
-          print >> sys.stderr, "XML hm:%s,%s,%s" % (id,entry,entry.number)
+          # print >> sys.stderr, "XML hm:%s,%s,%s" % (id,entry,entry.number)
           xml += "\t<hm>%s</hm>\n" % entry.number
         xml += "\t</entry>\n"
         id = id + 1
@@ -169,7 +171,7 @@ def index():
     # the "far end" (i.e. opposite the specified first/last). Only complete items
     # are sent.
     if "count" in request.args:
-        parameters['count'] = request.args["count"]
+        parameters['count'] = int(request.args["count"])
 
     # limit:
     # The limit defines the maximum amount of memory that the client is able to process for
@@ -195,6 +197,7 @@ def index():
     # nickname
     if "nn" in request.args and request.args["nn"] != '*':
         keyword = request.args["nn"]
+        # print >> sys.stderr, "in nn with '%s'" % (keyword)
         keyword = keyword.replace('*','')
         # print >> sys.stderr, "in nn with '%s'" % (keyword)
         # Get the directory and filter the entries based on the keyword, then sort them
@@ -204,6 +207,7 @@ def index():
     # Firstname
     elif "fn" in request.args and request.args["fn"] != '*':
         keyword = request.args["fn"]
+        # print >> sys.stderr, "in fn with '%s'" % (keyword)
         keyword = keyword.replace('*','')
         # print >> sys.stderr, "in fn with '%s'" % (keyword)
         # Get the directory and filter the entries based on the keyword, then sort them
@@ -213,7 +217,7 @@ def index():
     # Lastname
     elif "ln" in request.args and request.args["ln"] != '*':
         keyword = request.args["ln"]
-        print >> sys.stderr, "in ln with '%s'" % (keyword)
+        # print >> sys.stderr, "in ln with '%s'" % (keyword)
         keyword = keyword.replace('*','')
         # print >> sys.stderr, "in ln with '%s'" % (keyword)
         # Get the directory and filter the entries based on the keyword, then sort them
@@ -222,20 +226,33 @@ def index():
 
 
     # home phone number
-    elif "hm" in request.args:
+    elif "hm" in request.args and request.args["hm"] != '*':
         phone = request.args["hm"]
+        # print >> sys.stderr, "in hm with '%s'" % (phone)
         phone = phone.replace('*','')
+        # print >> sys.stderr, "in hm with '%s'" % (phone)
         # Get the directory and filter the entries based on the phone, then sort them
         directory = sorted([entry for entry in get_directory() if phone.lower() in unicode(entry.name).lower() or phone in unicode(entry.number)], key=lambda entry: unicode(entry))
         xml = generate_directory_xml(directory,offset,parameters)
 
     # mobile phone number
-    elif "mb" in request.args:
+    elif "mb" in request.args and request.args["mb"] != '*':
         phone = request.args["mb"]
+        # print >> sys.stderr, "in mb with '%s'" % (phone)
         phone = phone.replace('*','')
+        # print >> sys.stderr, "in mb with '%s'" % (phone)
         # Get the directory and filter the entries based on the phone, then sort them
         directory = sorted([entry for entry in get_directory() if phone.lower() in unicode(entry.name).lower() or phone in unicode(entry.number)], key=lambda entry: unicode(entry))
         xml = generate_directory_xml(directory,offset,parameters)
+
+#    else:
+#        # generate a fake answers...
+#        phone = request.args["hm"]
+#        print >> sys.stderr, "in hm with '%s'" % (phone)
+#        phone = phone.replace('*','')
+#        print >> sys.stderr, "in hm with '%s'" % (phone)
+#        directory = sorted([entry for entry in get_directory() if phone.lower() in unicode(entry.name).lower() or phone in unicode(entry.number)], key=lambda entry: unicode(entry))
+#        xml = generate_directory_xml(directory,offset,parameters)
 
     response = app.response_class(xml, mimetype='text/xml')
 
